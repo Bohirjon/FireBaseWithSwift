@@ -11,4 +11,5 @@ import Foundation
 struct Message {
     let from: String
     let message: String
+    let sentDate: Int64
 }
