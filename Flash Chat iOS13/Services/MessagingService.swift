@@ -12,7 +12,7 @@ import Firebase
 
 //Mark: - MessagingDelegate
 protocol MessagingDelegate {
-    func messageRecieved(message:Message)
+    func messagesRecieved(messages:[Message])
     func messageSendingFailed(message:Message, errorMessage:String)
     func messageSent(message:Message)
 }
@@ -28,9 +28,30 @@ class MessagingService: MessagingServiceProtocol {
     var messagingDelegate: MessagingDelegate?
     var firestore: Firestore?
     
-    init(messagingDelegate: MessagingDelegate) {
-        self.messagingDelegate = messagingDelegate
+    init() {
         firestore = Firestore.firestore()
+        firestore?.collection(Constants.DataBase.MessagesCollection)
+            .order(by: Constants.DataBase.MessageSentDateField)
+            .addSnapshotListener { (snapshot, error) in
+                if let safeError = error {
+                    print(safeError)
+                } else {
+                    if  let documents = snapshot?.documents {
+                        var messages = [Message]()
+                        
+                        for document in documents {
+                            let data = document.data()
+                            let sender = data[Constants.DataBase.SenderField] as! String
+                            let messageContent = data[Constants.DataBase.MessageField] as! String
+                            let dateSeconds = data[Constants.DataBase.MessageSentDateField] as! Double
+                            
+                            let message = Message(from: sender, message: messageContent, sentDate: dateSeconds)
+                            messages.append(message)
+                        }
+                        self.messagingDelegate?.messagesRecieved(messages: messages)
+                    }
+                }
+            }
     }
     
     func sendMessage(message: Message) {
@@ -42,7 +63,7 @@ class MessagingService: MessagingServiceProtocol {
                          completion: { (error) in
                             if let safeError = error {
                                 self.messagingDelegate?.messageSendingFailed(message: message, errorMessage: safeError.localizedDescription)
-                            }else {
+                            } else {
                                 self.messagingDelegate?.messageSent(message: message)
                             }
                          })
